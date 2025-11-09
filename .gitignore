@@ -1,0 +1,58 @@
+# Data files - too large for GitHub
+data/raw/**
+!data/raw/.gitkeep
+data/processed/cleaned_files/*.csv
+
+# Keep folder structure but ignore large files
+!data/processed/.gitkeep
+!data/processed/cleaned_files/.gitkeep
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment files
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Large compressed files
+*.zip
+*.tar.gz
+*.7z
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Keep small reference files
+!**/column_documentation.csv
+!**/summary_stats.csv
