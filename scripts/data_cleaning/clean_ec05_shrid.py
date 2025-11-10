@@ -190,12 +190,6 @@ def save_simplified_data(df_simplified):
     df_simplified.to_csv(output_file, index=False)
     print(f"Saved simplified data to {output_file}")
     
-    # Create summary statistics
-    summary_stats = df_simplified.describe()
-    summary_file = CLEANED_FILES_DIR / "ec05_shrid_summary_stats.csv"
-    summary_stats.to_csv(summary_file)
-    print(f"Saved summary statistics to {summary_file}")
-    
     # Create column documentation
     industry_groups = define_industry_groups()
     
@@ -258,11 +252,11 @@ def main():
     print(f"Reduction: {100 * (1 - len(df_simplified.columns)/len(df.columns)):.1f}%")
     print(f"Output file: {output_file}")
     print("\nKey improvements for market segmentation:")
-    print("✓ Grouped 90 SHRIC codes into 14 meaningful industry categories")
-    print("✓ Created economic diversity and sophistication indicators")
-    print("✓ Added employment structure ratios (formal/informal, male/female)")
-    print("✓ Calculated firm density and business sophistication metrics")
-    print("✓ Removed technical columns not needed for segmentation")
+    print("* Grouped 90 SHRIC codes into 14 meaningful industry categories")
+    print("* Created economic diversity and sophistication indicators")
+    print("* Added employment structure ratios (formal/informal, male/female)")
+    print("* Calculated firm density and business sophistication metrics")
+    print("* Removed technical columns not needed for segmentation")
 
 if __name__ == "__main__":
     main()

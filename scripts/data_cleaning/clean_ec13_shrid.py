@@ -109,8 +109,9 @@ def simplify_ec13_data(df):
         'ec13_emp_services',        # Services employment (already aggregated)
     ]
     
-    # 2. Create new dataset with core columns
-    df_simplified = df[core_columns].copy()
+    # 2. Create new dataset with core columns (only include columns that exist)
+    existing_core_columns = [col for col in core_columns if col in df.columns]
+    df_simplified = df[existing_core_columns].copy()
     
     # 3. Create industry group employment columns by summing SHRIC codes
     industry_groups = define_industry_groups()
@@ -130,30 +131,35 @@ def simplify_ec13_data(df):
     print("Creating derived features for market segmentation...")
     
     # Economic diversity score (number of industry groups with employment > 0)
-    industry_emp_columns = [col for col in df_simplified.columns if col.startswith('ec13_emp_') and 'group' not in col and col not in core_columns]
-    df_simplified['ec13_economic_diversity_score'] = (df_simplified[industry_emp_columns] > 0).sum(axis=1)
+    industry_emp_columns = [col for col in df_simplified.columns if col.startswith('ec13_emp_') and 'group' not in col and col not in existing_core_columns]
+    if industry_emp_columns:
+        df_simplified['ec13_economic_diversity_score'] = (df_simplified[industry_emp_columns] > 0).sum(axis=1)
     
     # Non-farm employment ratio (excluding primary industries)
-    df_simplified['ec13_non_farm_employment'] = (
-        df_simplified['ec13_emp_all'] - df_simplified['ec13_emp_primary_industries']
-    )
-    df_simplified['ec13_non_farm_employment_ratio'] = (
-        df_simplified['ec13_non_farm_employment'] / df_simplified['ec13_emp_all'].replace(0, np.nan)
-    ).fillna(0)
+    if 'ec13_emp_primary_industries' in df_simplified.columns and 'ec13_emp_all' in df_simplified.columns:
+        df_simplified['ec13_non_farm_employment'] = (
+            df_simplified['ec13_emp_all'] - df_simplified['ec13_emp_primary_industries']
+        )
+        df_simplified['ec13_non_farm_employment_ratio'] = (
+            df_simplified['ec13_non_farm_employment'] / df_simplified['ec13_emp_all'].replace(0, np.nan)
+        ).fillna(0)
     
     # Firm density (firms per 1000 employment)
-    df_simplified['ec13_firm_density'] = (
-        df_simplified['ec13_count_all'] / (df_simplified['ec13_emp_all'] / 1000).replace(0, np.nan)
-    ).fillna(0)
-    
-    # Employment per firm
-    df_simplified['ec13_employment_per_firm'] = (
-        df_simplified['ec13_emp_all'] / df_simplified['ec13_count_all'].replace(0, np.nan)
-    ).fillna(0)
+    if 'ec13_count_all' in df_simplified.columns and 'ec13_emp_all' in df_simplified.columns:
+        df_simplified['ec13_firm_density'] = (
+            df_simplified['ec13_count_all'] / (df_simplified['ec13_emp_all'] / 1000).replace(0, np.nan)
+        ).fillna(0)
+        
+        # Employment per firm
+        df_simplified['ec13_employment_per_firm'] = (
+            df_simplified['ec13_emp_all'] / df_simplified['ec13_count_all'].replace(0, np.nan)
+        ).fillna(0)
     
     # Retail diversity (important for market sophistication)
     retail_columns = ['ec13_emp_wholesale_trade', 'ec13_emp_retail_consumer']
-    df_simplified['ec13_retail_diversity'] = (df_simplified[retail_columns] > 0).sum(axis=1)
+    existing_retail_columns = [col for col in retail_columns if col in df_simplified.columns]
+    if existing_retail_columns:
+        df_simplified['ec13_retail_diversity'] = (df_simplified[existing_retail_columns] > 0).sum(axis=1)
     
     # Service sector sophistication
     service_sophistication_columns = [
@@ -163,18 +169,24 @@ def simplify_ec13_data(df):
         'ec13_emp_social_services',
         'ec13_emp_entertainment_culture'
     ]
-    df_simplified['ec13_service_sophistication_score'] = (df_simplified[service_sophistication_columns] > 0).sum(axis=1)
+    existing_service_columns = [col for col in service_sophistication_columns if col in df_simplified.columns]
+    if existing_service_columns:
+        df_simplified['ec13_service_sophistication_score'] = (df_simplified[existing_service_columns] > 0).sum(axis=1)
     
     # Female employment ratio (gender equality indicator)
-    df_simplified['ec13_female_employment_ratio'] = (
-        df_simplified['ec13_emp_f'] / df_simplified['ec13_emp_all'].replace(0, np.nan)
-    ).fillna(0)
+    if 'ec13_emp_f' in df_simplified.columns and 'ec13_emp_all' in df_simplified.columns:
+        df_simplified['ec13_female_employment_ratio'] = (
+            df_simplified['ec13_emp_f'] / df_simplified['ec13_emp_all'].replace(0, np.nan)
+        ).fillna(0)
     
     # Formal vs informal employment ratio (economic development indicator)
-    df_simplified['ec13_formal_employment_ratio'] = (
-        (df_simplified['ec13_emp_gov'] + df_simplified['ec13_emp_priv']) / 
-        df_simplified['ec13_emp_all'].replace(0, np.nan)
-    ).fillna(0)
+    formal_columns = ['ec13_emp_gov', 'ec13_emp_priv']
+    existing_formal_columns = [col for col in formal_columns if col in df_simplified.columns]
+    if existing_formal_columns and 'ec13_emp_all' in df_simplified.columns:
+        df_simplified['ec13_formal_employment_ratio'] = (
+            df_simplified[existing_formal_columns].sum(axis=1) / 
+            df_simplified['ec13_emp_all'].replace(0, np.nan)
+        ).fillna(0)
     
     print(f"Simplified dataset: {len(df_simplified)} rows, {len(df_simplified.columns)} columns")
     print(f"Reduced from {len(df.columns)} to {len(df_simplified.columns)} columns")
@@ -190,23 +202,18 @@ def save_simplified_data(df_simplified):
     df_simplified.to_csv(output_file, index=False)
     print(f"Saved simplified data to {output_file}")
     
-    # Create summary statistics
-    summary_stats = df_simplified.describe()
-    summary_file = CLEANED_FILES_DIR / "ec13_shrid_summary_stats.csv"
-    summary_stats.to_csv(summary_file)
-    print(f"Saved summary statistics to {summary_file}")
-    
     # Create column documentation
     industry_groups = define_industry_groups()
     
     documentation = []
     for group_name, shric_codes in industry_groups.items():
-        documentation.append({
-            'column_name': f'ec13_emp_{group_name}',
-            'description': f'Total employment in {group_name.replace("_", " ")} sector',
-            'shric_codes_included': ', '.join(map(str, shric_codes)),
-            'variable_type': 'Industry Group Employment'
-        })
+        if f'ec13_emp_{group_name}' in df_simplified.columns:
+            documentation.append({
+                'column_name': f'ec13_emp_{group_name}',
+                'description': f'Total employment in {group_name.replace("_", " ")} sector',
+                'shric_codes_included': ', '.join(map(str, shric_codes)),
+                'variable_type': 'Industry Group Employment'
+            })
     
     # Add derived features documentation
     derived_features = [
@@ -221,12 +228,13 @@ def save_simplified_data(df_simplified):
     ]
     
     for col_name, description, var_type in derived_features:
-        documentation.append({
-            'column_name': col_name,
-            'description': description,
-            'shric_codes_included': 'Derived feature',
-            'variable_type': var_type
-        })
+        if col_name in df_simplified.columns:
+            documentation.append({
+                'column_name': col_name,
+                'description': description,
+                'shric_codes_included': 'Derived feature',
+                'variable_type': var_type
+            })
     
     doc_df = pd.DataFrame(documentation)
     doc_file = CLEANED_FILES_DIR / "ec13_shrid_column_documentation.csv"
@@ -258,11 +266,11 @@ def main():
     print(f"Reduction: {100 * (1 - len(df_simplified.columns)/len(df.columns)):.1f}%")
     print(f"Output file: {output_file}")
     print("\nKey improvements for market segmentation:")
-    print("✓ Grouped 90 SHRIC codes into 14 meaningful industry categories")
-    print("✓ Created economic diversity and sophistication indicators")
-    print("✓ Added employment structure ratios (formal/informal, male/female)")
-    print("✓ Calculated firm density and business sophistication metrics")
-    print("✓ Removed technical columns not needed for segmentation")
+    print("* Grouped 90 SHRIC codes into 14 meaningful industry categories")
+    print("* Created economic diversity and sophistication indicators")
+    print("* Added employment structure ratios (formal/informal, male/female)")
+    print("* Calculated firm density and business sophistication metrics")
+    print("* Removed technical columns not needed for segmentation")
 
 if __name__ == "__main__":
     main()
